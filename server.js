@@ -5,6 +5,7 @@ import connectDB from "./config/db.js";
 import deviceRoutes from "./routes/deviceRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 
 config();
 connectDB();
@@ -19,6 +20,7 @@ console.log("📋 Setting up routes...");
 app.use("/api", deviceRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/admin", adminRoutes);
 console.log("✅ Routes configured");
 
 app.get("/api/test", (req, res) => {
