@@ -1,6 +1,6 @@
-import User from "../models/userModel.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import User from "../models/userModel.js";
 
 export const signup = async (req, res) => {
   const { username, email, password } = req.body;
@@ -13,9 +13,17 @@ export const signup = async (req, res) => {
       username,
       email,
       password: hashedPassword,
+      role: "user", // Explicitly set default role
     });
-    const token = jwt.sign({ id: user._id }, "jwt_secret", { expiresIn: "7d" });
-    res.status(201).json({ token, user: { id: user._id, username, email } });
+    const token = jwt.sign({ id: user._id, role: user.role }, "jwt_secret", {
+      expiresIn: "7d",
+    });
+    res
+      .status(201)
+      .json({
+        token,
+        user: { id: user._id, username, email, role: user.role },
+      });
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
@@ -29,10 +37,15 @@ export const login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
       return res.status(400).json({ message: "Invalid credentials" });
-    const token = jwt.sign({ id: user._id }, "jwt_secret", { expiresIn: "7d" });
+    const token = jwt.sign({ id: user._id, role: user.role }, "jwt_secret", {
+      expiresIn: "7d",
+    });
     res
       .status(200)
-      .json({ token, user: { id: user._id, username: user.username, email } });
+      .json({
+        token,
+        user: { id: user._id, username: user.username, email, role: user.role },
+      });
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
