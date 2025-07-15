@@ -1,5 +1,9 @@
 import { Router } from "express";
-import { getUserStats, getAllUsers } from "../controllers/adminController.js";
+import {
+  getUserStats,
+  getAllUsers,
+  getUserDetails,
+} from "../controllers/adminController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = Router();
@@ -17,5 +21,6 @@ const adminMiddleware = (req, res, next) => {
 router.use(authMiddleware);
 router.get("/stats", adminMiddleware, getUserStats);
 router.get("/users", adminMiddleware, getAllUsers);
+router.get("/users/:userId", adminMiddleware, getUserDetails);
 
 export default router;
