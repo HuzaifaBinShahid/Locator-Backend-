@@ -1,7 +1,10 @@
-const router = Router();
 import { Router } from "express";
 import { saveDeviceInfo } from "../controllers/deviceController.js";
+import authMiddleware from "../middleware/authMiddleware.js";
 
-router.post("/saveDeviceInfo", saveDeviceInfo);
+const router = Router();
+
+// Protect device routes with authentication
+router.post("/saveDeviceInfo", authMiddleware, saveDeviceInfo);
 
 export default router;

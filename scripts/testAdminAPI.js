@@ -2,10 +2,6 @@ import fetch from "node-fetch";
 
 const testAdminAPI = async () => {
   try {
-    console.log("🧪 Testing Admin API endpoints...\n");
-
-    // First, login as admin to get token
-    console.log("1. Logging in as admin...");
     const loginResponse = await fetch(
       "http://192.168.10.9:5000/api/auth/login",
       {
@@ -25,12 +21,8 @@ const testAdminAPI = async () => {
       return;
     }
 
-    console.log("✅ Admin login successful");
-    console.log("Admin user:", loginData.user);
     const token = loginData.token;
 
-    // Test admin stats endpoint
-    console.log("\n2. Testing admin stats endpoint...");
     const statsResponse = await fetch(
       "http://192.168.10.9:5000/api/admin/stats",
       {
@@ -57,7 +49,6 @@ const testAdminAPI = async () => {
       console.log("❌ Failed to fetch admin stats:", statsData.message);
     }
 
-    // Test admin users endpoint
     console.log("\n3. Testing admin users endpoint...");
     const usersResponse = await fetch(
       "http://192.168.10.9:5000/api/admin/users",

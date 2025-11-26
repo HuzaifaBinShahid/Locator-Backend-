@@ -1,11 +1,12 @@
-import express, { json } from "express";
 import cors from "cors";
+import express, { json } from "express";
+
 import { config } from "dotenv";
 import connectDB from "./config/db.js";
-import deviceRoutes from "./routes/deviceRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
-import attendanceRoutes from "./routes/attendanceRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import deviceRoutes from "./routes/deviceRoutes.js";
+import attendanceRoutes from "./routes/attendanceRoutes.js";
 
 config();
 connectDB();
@@ -16,12 +17,10 @@ const app = express();
 app.use(cors());
 app.use(json());
 
-console.log("📋 Setting up routes...");
 app.use("/api", deviceRoutes);
 app.use("/api/auth", authRoutes);
-app.use("/api/attendance", attendanceRoutes);
 app.use("/api/admin", adminRoutes);
-console.log("✅ Routes configured");
+app.use("/api/attendance", attendanceRoutes);
 
 app.get("/api/test", (req, res) => {
   res.json({ message: "Server is working!" });

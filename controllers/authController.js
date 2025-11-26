@@ -13,7 +13,7 @@ export const signup = async (req, res) => {
       username,
       email,
       password: hashedPassword,
-      role: "user", // Explicitly set default role
+      role: "user",
     });
     const token = jwt.sign({ id: user._id, role: user.role }, "jwt_secret", {
       expiresIn: "7d",
