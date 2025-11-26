@@ -3,6 +3,7 @@ import {
   getUserStats,
   getAllUsers,
   getUserDetails,
+  exportUsersData,
 } from "../controllers/adminController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 
@@ -22,5 +23,6 @@ router.use(authMiddleware);
 router.get("/stats", adminMiddleware, getUserStats);
 router.get("/users", adminMiddleware, getAllUsers);
 router.get("/users/:userId", adminMiddleware, getUserDetails);
+router.get("/export-users", adminMiddleware, exportUsersData);
 
 export default router;

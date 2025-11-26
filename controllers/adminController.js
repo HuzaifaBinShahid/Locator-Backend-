@@ -1,5 +1,6 @@
 import User from "../models/userModel.js";
 import Attendance from "../models/attendanceModel.js";
+import * as XLSX from "xlsx";
 
 export const getUserStats = async (req, res) => {
   try {
@@ -36,7 +37,7 @@ export const getAllUsers = async (req, res) => {
   try {
     const users = await User.find(
       { role: { $ne: "admin" } },
-      "username email role createdAt"
+      "username email role createdAt profileImage"
     ).sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -105,6 +106,7 @@ export const getUserDetails = async (req, res) => {
           email: user.email,
           role: user.role,
           createdAt: user.createdAt,
+          profileImage: user.profileImage,
         },
         attendanceHistory,
         statistics: {
@@ -119,6 +121,82 @@ export const getUserDetails = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch user details",
+    });
+  }
+};
+
+export const exportUsersData = async (req, res) => {
+  try {
+    const users = await User.find(
+      { role: { $ne: "admin" } },
+      "username email createdAt"
+    ).sort({ createdAt: -1 });
+
+    const exportData = [];
+
+    for (const user of users) {
+      const attendanceHistory = await Attendance.find({
+        userId: user._id,
+      }).sort({ date: -1 });
+
+      const joinedDate = user.createdAt
+        ? new Date(user.createdAt).toISOString().split("T")[0]
+        : "";
+
+      if (attendanceHistory.length > 0) {
+        attendanceHistory.forEach((attendance) => {
+          exportData.push({
+            Name: user.username || "",
+            Email: user.email || "",
+            "Joined Date": joinedDate,
+            "Attendance Date": attendance.date || "",
+            "Check-in Time": attendance.checkinTime
+              ? new Date(attendance.checkinTime).toLocaleString()
+              : "",
+            "Check-out Time": attendance.checkoutTime
+              ? new Date(attendance.checkoutTime).toLocaleString()
+              : "",
+            "Check-in Location": attendance.checkinLocation?.address || "",
+            "Check-out Location": attendance.checkoutLocation?.address || "",
+            "Total Hours": attendance.totalHours || 0,
+          });
+        });
+      } else {
+        exportData.push({
+          Name: user.username || "",
+          Email: user.email || "",
+          "Joined Date": joinedDate,
+          "Attendance Date": "",
+          "Check-in Time": "",
+          "Check-out Time": "",
+          "Check-in Location": "",
+          "Check-out Location": "",
+          "Total Hours": "",
+        });
+      }
+    }
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Users Data");
+
+    const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=users_export_${Date.now()}.xlsx`
+    );
+
+    res.send(buffer);
+  } catch (error) {
+    console.error("Error exporting users data:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to export users data",
     });
   }
 };

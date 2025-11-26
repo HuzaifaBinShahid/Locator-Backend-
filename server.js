@@ -17,6 +17,11 @@ const app = express();
 app.use(cors());
 app.use(json());
 
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  next();
+});
+
 app.use("/api", deviceRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
