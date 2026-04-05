@@ -15,7 +15,7 @@ export const signup = async (req, res) => {
       password: hashedPassword,
       role: "user",
     });
-    const token = jwt.sign({ id: user._id, role: user.role }, "jwt_secret", {
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
     res
@@ -37,7 +37,7 @@ export const login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
       return res.status(400).json({ message: "Invalid credentials" });
-    const token = jwt.sign({ id: user._id, role: user.role }, "jwt_secret", {
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
     res
@@ -117,7 +117,7 @@ export const biometricLogin = async (req, res) => {
     if (!user.biometricEnabled) {
       return res.status(400).json({ message: "Biometric not enabled for this user" });
     }
-    const token = jwt.sign({ id: user._id, role: user.role }, "jwt_secret", {
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
     res.status(200).json({

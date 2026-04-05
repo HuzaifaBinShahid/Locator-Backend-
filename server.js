@@ -31,8 +31,12 @@ app.get("/api/test", (req, res) => {
   res.json({ message: "Server is working!" });
 });
 
-app.listen(PORT, "0.0.0.0", () =>
-  console.log(
-    `🚀 Server is running on port ${PORT} 🔥 and accessible over your local network`
-  )
-);
+if (process.env.NODE_ENV !== "production") {
+  app.listen(PORT, "0.0.0.0", () =>
+    console.log(
+      `🚀 Server is running on port ${PORT} 🔥 and accessible over your local network`
+    )
+  );
+}
+
+export default app;
