@@ -3,8 +3,11 @@ import jwt from "jsonwebtoken";
 import User from "../models/userModel.js";
 
 export const signup = async (req, res) => {
-  const { username, email, password } = req.body;
+  const { username, email, password, nieOrDni, socialSecurityNumber, profileImage } = req.body;
   try {
+    if (!nieOrDni || !socialSecurityNumber) {
+      return res.status(400).json({ message: "NIE/DNI and Social Security Number are required" });
+    }
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser)
       return res.status(400).json({ message: "User already exists" });
@@ -14,6 +17,9 @@ export const signup = async (req, res) => {
       email,
       password: hashedPassword,
       role: "user",
+      nieOrDni,
+      socialSecurityNumber,
+      profileImage: profileImage || null,
     });
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
       expiresIn: "7d",
@@ -22,7 +28,7 @@ export const signup = async (req, res) => {
       .status(201)
       .json({
         token,
-        user: { id: user._id, username, email, role: user.role, biometricEnabled: user.biometricEnabled, profileImage: user.profileImage },
+        user: { id: user._id, username, email, role: user.role, biometricEnabled: user.biometricEnabled, profileImage: user.profileImage, nieOrDni: user.nieOrDni, socialSecurityNumber: user.socialSecurityNumber },
       });
   } catch (err) {
     res.status(500).json({ message: "Server error" });
@@ -44,7 +50,7 @@ export const login = async (req, res) => {
       .status(200)
       .json({
         token,
-        user: { id: user._id, username: user.username, email, role: user.role, biometricEnabled: user.biometricEnabled, profileImage: user.profileImage },
+        user: { id: user._id, username: user.username, email, role: user.role, biometricEnabled: user.biometricEnabled, profileImage: user.profileImage, nieOrDni: user.nieOrDni, socialSecurityNumber: user.socialSecurityNumber },
       });
   } catch (err) {
     res.status(500).json({ message: "Server error" });
@@ -122,7 +128,7 @@ export const biometricLogin = async (req, res) => {
     });
     res.status(200).json({
       token,
-      user: { id: user._id, username: user.username, email: user.email, role: user.role, biometricEnabled: user.biometricEnabled, profileImage: user.profileImage },
+      user: { id: user._id, username: user.username, email: user.email, role: user.role, biometricEnabled: user.biometricEnabled, profileImage: user.profileImage, nieOrDni: user.nieOrDni, socialSecurityNumber: user.socialSecurityNumber },
     });
   } catch (err) {
     res.status(500).json({ message: "Server error" });

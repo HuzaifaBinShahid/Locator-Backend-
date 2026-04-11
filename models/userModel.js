@@ -6,5 +6,7 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
   biometricEnabled: { type: Boolean, default: false },
   profileImage: { type: String, default: null },
-});
+  nieOrDni: { type: String, default: null },
+  socialSecurityNumber: { type: String, default: null },
+}, { timestamps: true });
 export default mongoose.model("User", userSchema);

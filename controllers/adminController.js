@@ -37,7 +37,7 @@ export const getAllUsers = async (req, res) => {
   try {
     const users = await User.find(
       { role: { $ne: "admin" } },
-      "username email role createdAt profileImage"
+      "username email role createdAt profileImage nieOrDni socialSecurityNumber"
     ).sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -107,6 +107,8 @@ export const getUserDetails = async (req, res) => {
           role: user.role,
           createdAt: user.createdAt,
           profileImage: user.profileImage,
+          nieOrDni: user.nieOrDni,
+          socialSecurityNumber: user.socialSecurityNumber,
         },
         attendanceHistory,
         statistics: {
@@ -129,7 +131,7 @@ export const exportUsersData = async (req, res) => {
   try {
     const users = await User.find(
       { role: { $ne: "admin" } },
-      "username email createdAt"
+      "username email createdAt nieOrDni socialSecurityNumber"
     ).sort({ createdAt: -1 });
 
     const exportData = [];
@@ -148,6 +150,8 @@ export const exportUsersData = async (req, res) => {
           exportData.push({
             Name: user.username || "",
             Email: user.email || "",
+            "NIE/DNI": user.nieOrDni || "",
+            "Social Security Number": user.socialSecurityNumber || "",
             "Joined Date": joinedDate,
             "Attendance Date": attendance.date || "",
             "Check-in Time": attendance.checkinTime
@@ -165,6 +169,8 @@ export const exportUsersData = async (req, res) => {
         exportData.push({
           Name: user.username || "",
           Email: user.email || "",
+          "NIE/DNI": user.nieOrDni || "",
+          "Social Security Number": user.socialSecurityNumber || "",
           "Joined Date": joinedDate,
           "Attendance Date": "",
           "Check-in Time": "",
@@ -197,6 +203,103 @@ export const exportUsersData = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to export users data",
+    });
+  }
+};
+
+export const getAttendanceReports = async (req, res) => {
+  try {
+    const { startDate, endDate, userId } = req.query;
+    const filter = {};
+    if (userId) filter.userId = userId;
+    if (startDate || endDate) {
+      filter.date = {};
+      if (startDate) filter.date.$gte = startDate;
+      if (endDate) filter.date.$lte = endDate;
+    }
+
+    const total = await Attendance.countDocuments(filter);
+    const records = await Attendance.find(filter)
+      .populate("userId", "username email nieOrDni socialSecurityNumber profileImage")
+      .sort({ date: -1, checkinTime: -1 });
+
+    const totalHours = records.reduce((sum, r) => sum + (r.totalHours || 0), 0);
+    const activeCount = records.filter((r) => r.isActive).length;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        records,
+        total,
+        summary: {
+          totalRecords: total,
+          totalHours: Math.round(totalHours * 100) / 100,
+          activeCount,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching attendance reports:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch attendance reports",
+    });
+  }
+};
+
+export const exportAttendanceData = async (req, res) => {
+  try {
+    const { startDate, endDate, userId } = req.query;
+    const filter = {};
+    if (userId) filter.userId = userId;
+    if (startDate || endDate) {
+      filter.date = {};
+      if (startDate) filter.date.$gte = startDate;
+      if (endDate) filter.date.$lte = endDate;
+    }
+
+    const attendanceRecords = await Attendance.find(filter)
+      .populate("userId", "username email nieOrDni socialSecurityNumber")
+      .sort({ date: -1 });
+
+    const exportData = attendanceRecords.map((record) => ({
+      Name: record.userId?.username || "",
+      Email: record.userId?.email || "",
+      "NIE/DNI": record.userId?.nieOrDni || "",
+      "Social Security Number": record.userId?.socialSecurityNumber || "",
+      "Attendance Date": record.date || "",
+      "Check-in Time": record.checkinTime
+        ? new Date(record.checkinTime).toLocaleString()
+        : "",
+      "Check-out Time": record.checkoutTime
+        ? new Date(record.checkoutTime).toLocaleString()
+        : "",
+      "Check-in Location": record.checkinLocation?.address || "",
+      "Check-out Location": record.checkoutLocation?.address || "",
+      "Total Hours": record.totalHours || 0,
+      Status: record.isActive ? "Active" : "Completed",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Attendance Data");
+    const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=attendance_export_${Date.now()}.xlsx`
+    );
+
+    res.send(buffer);
+  } catch (error) {
+    console.error("Error exporting attendance data:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to export attendance data",
     });
   }
 };
