@@ -4,16 +4,10 @@ import * as XLSX from "xlsx";
 
 export const getUserStats = async (req, res) => {
   try {
-    const totalUsers = await User.countDocuments({ role: { $ne: "admin" } });
-    const totalAdmins = await User.countDocuments({ role: "admin" });
-    const allUsers = await User.countDocuments();
-
-    const recentUsers = await User.find(
-      { role: { $ne: "admin" } },
-      "username email createdAt"
-    )
-      .sort({ createdAt: -1 })
-      .limit(10);
+    const totalUsers = await User.countByRole("admin", { not: true });
+    const totalAdmins = await User.countByRole("admin");
+    const allUsers = await User.countByRole(null);
+    const recentUsers = await User.listNonAdmins({ limit: 10 });
 
     res.status(200).json({
       success: true,
@@ -21,87 +15,86 @@ export const getUserStats = async (req, res) => {
         totalUsers,
         totalAdmins,
         allUsers,
-        recentUsers,
+        recentUsers: recentUsers.map((u) => ({
+          _id: u.id,
+          username: u.username,
+          email: u.email,
+          createdAt: u.createdAt,
+        })),
       },
     });
   } catch (error) {
-    console.error("Error fetching user stats:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch user statistics",
-    });
+    console.error("getUserStats error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch user statistics" });
   }
 };
 
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find(
-      { role: { $ne: "admin" } },
-      "username email role createdAt profileImage nieOrDni socialSecurityNumber"
-    ).sort({ createdAt: -1 });
-
+    const users = await User.listNonAdmins();
     res.status(200).json({
       success: true,
       data: {
-        users,
+        users: users.map((u) => ({
+          _id: u.id,
+          username: u.username,
+          email: u.email,
+          role: u.role,
+          createdAt: u.createdAt,
+          profileImage: u.profileImage,
+          nieOrDni: u.nieOrDni,
+          socialSecurityNumber: u.socialSecurityNumber,
+        })),
         count: users.length,
       },
     });
   } catch (error) {
-    console.error("Error fetching users:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch users",
-    });
+    console.error("getAllUsers error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch users" });
   }
 };
 
-// Get specific user details with attendance history
 export const getUserDetails = async (req, res) => {
   try {
     const { userId } = req.params;
-
-    // Get user details
-    const user = await User.findById(userId).select("-password");
+    const user = await User.findById(userId, { selectPassword: false });
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
-    // Get user's attendance history (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const attendanceHistory = await Attendance.find({
-      userId: userId,
-      checkinTime: { $gte: thirtyDaysAgo },
-    }).sort({ date: -1 });
+    const attendanceHistory = await Attendance.findByUserSince(
+      userId,
+      thirtyDaysAgo
+    );
 
-    // Calculate total hours worked in last 30 days
-    const totalHoursLast30Days = attendanceHistory.reduce((total, record) => {
-      return total + (record.totalHours || 0);
-    }, 0);
+    const totalHoursLast30Days = attendanceHistory.reduce(
+      (total, record) => total + (record.totalHours || 0),
+      0
+    );
 
-    // Get current month attendance count
     const currentMonth = new Date();
     const firstDayOfMonth = new Date(
       currentMonth.getFullYear(),
       currentMonth.getMonth(),
       1
     );
-
-    const currentMonthAttendance = await Attendance.countDocuments({
-      userId: userId,
-      checkinTime: { $gte: firstDayOfMonth },
-    });
+    const currentMonthAttendance = await Attendance.countByUserSince(
+      userId,
+      firstDayOfMonth
+    );
 
     res.status(200).json({
       success: true,
       data: {
         user: {
-          id: user._id,
+          id: user.id,
           username: user.username,
           email: user.email,
           role: user.role,
@@ -112,57 +105,50 @@ export const getUserDetails = async (req, res) => {
         },
         attendanceHistory,
         statistics: {
-          totalHoursLast30Days: Math.round(totalHoursLast30Days * 100) / 100,
+          totalHoursLast30Days:
+            Math.round(totalHoursLast30Days * 100) / 100,
           attendanceDaysLast30Days: attendanceHistory.length,
           currentMonthAttendance,
         },
       },
     });
   } catch (error) {
-    console.error("Error fetching user details:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch user details",
-    });
+    console.error("getUserDetails error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch user details" });
   }
 };
 
 export const exportUsersData = async (req, res) => {
   try {
-    const users = await User.find(
-      { role: { $ne: "admin" } },
-      "username email createdAt nieOrDni socialSecurityNumber"
-    ).sort({ createdAt: -1 });
+    const users = await User.listNonAdmins();
 
     const exportData = [];
-
     for (const user of users) {
-      const attendanceHistory = await Attendance.find({
-        userId: user._id,
-      }).sort({ date: -1 });
-
+      const attendanceHistory = await Attendance.findAllByUser(user.id);
       const joinedDate = user.createdAt
         ? new Date(user.createdAt).toISOString().split("T")[0]
         : "";
 
       if (attendanceHistory.length > 0) {
-        attendanceHistory.forEach((attendance) => {
+        attendanceHistory.forEach((a) => {
           exportData.push({
             Name: user.username || "",
             Email: user.email || "",
             "NIE/DNI": user.nieOrDni || "",
             "Social Security Number": user.socialSecurityNumber || "",
             "Joined Date": joinedDate,
-            "Attendance Date": attendance.date || "",
-            "Check-in Time": attendance.checkinTime
-              ? new Date(attendance.checkinTime).toLocaleString()
+            "Attendance Date": a.date || "",
+            "Check-in Time": a.checkinTime
+              ? new Date(a.checkinTime).toLocaleString()
               : "",
-            "Check-out Time": attendance.checkoutTime
-              ? new Date(attendance.checkoutTime).toLocaleString()
+            "Check-out Time": a.checkoutTime
+              ? new Date(a.checkoutTime).toLocaleString()
               : "",
-            "Check-in Location": attendance.checkinLocation?.address || "",
-            "Check-out Location": attendance.checkoutLocation?.address || "",
-            "Total Hours": attendance.totalHours || 0,
+            "Check-in Location": a.checkinLocation?.address || "",
+            "Check-out Location": a.checkoutLocation?.address || "",
+            "Total Hours": a.totalHours || 0,
           });
         });
       } else {
@@ -185,7 +171,6 @@ export const exportUsersData = async (req, res) => {
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Users Data");
-
     const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 
     res.setHeader(
@@ -196,34 +181,25 @@ export const exportUsersData = async (req, res) => {
       "Content-Disposition",
       `attachment; filename=users_export_${Date.now()}.xlsx`
     );
-
     res.send(buffer);
   } catch (error) {
-    console.error("Error exporting users data:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to export users data",
-    });
+    console.error("exportUsersData error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to export users data" });
   }
 };
 
 export const getAttendanceReports = async (req, res) => {
   try {
     const { startDate, endDate, userId } = req.query;
-    const filter = {};
-    if (userId) filter.userId = userId;
-    if (startDate || endDate) {
-      filter.date = {};
-      if (startDate) filter.date.$gte = startDate;
-      if (endDate) filter.date.$lte = endDate;
-    }
+    const records = await Attendance.findReports({ userId, startDate, endDate });
 
-    const total = await Attendance.countDocuments(filter);
-    const records = await Attendance.find(filter)
-      .populate("userId", "username email nieOrDni socialSecurityNumber profileImage")
-      .sort({ date: -1, checkinTime: -1 });
-
-    const totalHours = records.reduce((sum, r) => sum + (r.totalHours || 0), 0);
+    const total = records.length;
+    const totalHours = records.reduce(
+      (sum, r) => sum + (r.totalHours || 0),
+      0
+    );
     const activeCount = records.filter((r) => r.isActive).length;
 
     res.status(200).json({
@@ -239,30 +215,19 @@ export const getAttendanceReports = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching attendance reports:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch attendance reports",
-    });
+    console.error("getAttendanceReports error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch attendance reports" });
   }
 };
 
 export const exportAttendanceData = async (req, res) => {
   try {
     const { startDate, endDate, userId } = req.query;
-    const filter = {};
-    if (userId) filter.userId = userId;
-    if (startDate || endDate) {
-      filter.date = {};
-      if (startDate) filter.date.$gte = startDate;
-      if (endDate) filter.date.$lte = endDate;
-    }
+    const records = await Attendance.findReports({ userId, startDate, endDate });
 
-    const attendanceRecords = await Attendance.find(filter)
-      .populate("userId", "username email nieOrDni socialSecurityNumber")
-      .sort({ date: -1 });
-
-    const exportData = attendanceRecords.map((record) => ({
+    const exportData = records.map((record) => ({
       Name: record.userId?.username || "",
       Email: record.userId?.email || "",
       "NIE/DNI": record.userId?.nieOrDni || "",
@@ -293,13 +258,11 @@ export const exportAttendanceData = async (req, res) => {
       "Content-Disposition",
       `attachment; filename=attendance_export_${Date.now()}.xlsx`
     );
-
     res.send(buffer);
   } catch (error) {
-    console.error("Error exporting attendance data:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to export attendance data",
-    });
+    console.error("exportAttendanceData error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to export attendance data" });
   }
 };
